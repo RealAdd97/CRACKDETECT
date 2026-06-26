@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CRACKDETECT — YOLOv8 Crack Detection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js">
+
+
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+   @font-face {
+ font-family: 'Thunder';
+ src: url('/fonts/Thunder-Bold.woff2') format('woff2'),
+ url('/fonts/Thunder-Bold.woff') format('woff');
+ font-weight: bold;
+ font-style: normal;
+}
+@font-face {
+ font-family: 'Ogg';
+ src: url('/fonts/Ogg-Roman.woff2') format('woff2');
+ font-weight: 400;
+ font-style: normal;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:16px;scroll-behavior:smooth;}
+:root{
+  --bg:#edeae3;
+  --bg2:#e5e2db;
+  --dark:#252220;
+  --darker:#181614;
+  --text:#201e1b;
+  --muted:#6b6760;
+  --subtle:#9a9690;
+  --border:#c6c2ba;
+  --border-l:#dedad3;
+  --t:  'Thunder','Arial Narrow',Impact,sans-serif;
+  --o:  'Ogg','Cormorant Garamond',Georgia,serif;
+}
+
+body{background:var(--bg);color:var(--text);font-family:var(--o);overflow-x:hidden;cursor:none;}
+a{text-decoration:none;color:inherit;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--dark);}
+
+/* ───── LOADER ───── */
+#loader{
+  position:fixed;inset:0;z-index:10000;
+  background:var(--darker);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+#loader-canvas{position:absolute;inset:0;width:100%;height:100%;}
+#loader-inner{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;
+  justify-content:space-between;
+  height:100%;
+  padding:2.2rem 2.5rem;
+}
+#loader-top{
+  display:flex;justify-content:space-between;align-items:flex-start;
+}
+.loader-label{
+  font-family:var(--t);font-size:0.7rem;letter-spacing:0.25em;
+  text-transform:uppercase;color:rgba(180,172,160,0.6);
+}
+#loader-mid{
+  display:flex;align-items:flex-end;gap:0.5rem;
+  line-height:1;
+}
+#loader-num{
+  font-family:var(--t);
+  font-size:clamp(7rem,22vw,20rem);
+  font-weight:700;letter-spacing:-0.02em;
+  color:rgba(200,195,185,0.9);
+  line-height:0.85;
+}
+#loader-pct{
+  font-family:var(--t);font-size:clamp(2rem,6vw,5rem);
+  font-weight:700;color:rgba(150,145,135,0.6);
+  padding-bottom:0.6em;
+}
+#loader-bottom{overflow:hidden;padding-bottom:0.2rem;}
+.loader-ticker{
+  display:flex;gap:3rem;
+  animation:loader-roll 12s linear infinite;
+  width:max-content;white-space:nowrap;
+}
+.loader-ticker-item{
+  font-family:var(--t);font-size:0.7rem;
+  letter-spacing:0.22em;text-transform:uppercase;
+  color:rgba(150,145,135,0.35);
+  flex-shrink:0;
+}
+@keyframes loader-roll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* ───── CURSOR ───── */
+#cur-ring{
+  position:fixed;width:38px;height:38px;
+  border:1px solid rgba(30,28,25,0.55);
+  border-radius:50%;pointer-events:none;
+  z-index:9998;transform:translate(-50%,-50%);
+  transition:width .22s,height .22s,border-color .22s,opacity .22s;
+  mix-blend-mode:multiply;
+}
+#cur-dot{
+  position:fixed;width:5px;height:5px;
+  background:var(--text);border-radius:50%;
+  pointer-events:none;z-index:9999;transform:translate(-50%,-50%);
+}
+#cur-ring.expand{width:64px;height:64px;opacity:0.4;}
+
+/* ───── NAV ───── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:500;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.4rem 2.5rem;
+  background:rgba(237,234,227,0.94);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+  opacity:0;
+}
+.nav-logo{
+  font-family:var(--t);font-size:0.9rem;font-weight:700;
+  letter-spacing:0.22em;text-transform:uppercase;color:var(--text);
+  cursor:none; 
+}
+.nav-logo span{color:var(--subtle);}
+.nav-links{display:flex;align-items:center;gap:2rem;list-style:none;}
+
+/* arrow reveal btn (button-02) */
+.btn-arrow{
+  font-family:var(--t);font-size:0.72rem;font-weight:600;
+  letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);
+  display:inline-flex;align-items:center;gap:0;
+  background:none;border:none;cursor:none;transition:color .2s;
+}
+.btn-arrow:hover{color:var(--text);}
+.btn-arrow .arrow{
+  display:inline-block;overflow:hidden;max-width:0;
+  transition:max-width .3s cubic-bezier(.76,0,.24,1);
+}
+.btn-arrow:hover .arrow{max-width:1.2rem;}
+
+/* slide text btn (button-01) */
+.btn-slide{
+  font-family:var(--t);font-size:0.72rem;font-weight:700;
+  letter-spacing:0.18em;text-transform:uppercase;
+  border:1px solid var(--border);color:var(--text);
+  padding:0;display:inline-block;position:relative;
+  overflow:hidden;cursor:none;height:2rem;width:max-content;
+}
+.btn-slide-inner{
+  display:flex;flex-direction:column;
+  transition:transform .32s cubic-bezier(.76,0,.24,1);
+  height:200%;
+}
+.btn-slide span{
+  height:50%;display:flex;align-items:center;
+  padding:0 1.2rem;white-space:nowrap;
+}
+.btn-slide:hover .btn-slide-inner{transform:translateY(-50%);}
+
+/* color fill btn (button-04) */
+.btn-fill{
+  font-family:var(--t);font-size:0.72rem;font-weight:700;
+  letter-spacing:0.18em;text-transform:uppercase;
+  border:1px solid var(--dark);color:var(--dark);
+  padding:.55rem 1.25rem;display:inline-block;
+  position:relative;overflow:hidden;cursor:none;
+  transition:color .32s;
+}
+.btn-fill::before{
+  content:'';position:absolute;inset:0;background:var(--dark);
+  transform:translateX(-101%);
+  transition:transform .32s cubic-bezier(.76,0,.24,1);z-index:-1;
+}
+.btn-fill:hover::before{transform:translateX(0);}
+.btn-fill:hover{color:var(--bg);}
+
+/* ───── HERO ───── */
+.hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  justify-content:flex-end;padding:8rem 2.5rem 4.5rem;
+  border-bottom:1px solid var(--border);position:relative;overflow:hidden;
+}
+#hero-crack-svg{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;
+}
+.hero-content{position:relative;z-index:1;}
+.hero-eyebrow{
+  font-family:var(--t);font-size:0.7rem;letter-spacing:0.25em;
+  text-transform:uppercase;color:var(--subtle);
+  overflow:hidden;margin-bottom:2.5rem;
+}
+.hero-eyebrow span{display:block;transform:translateY(120%);}
+
+/* slide-up text reveal (text-reveal-01) */
+.hero-title{
+  font-family:var(--t);
+  font-size:clamp(5rem,13vw,15rem);
+  font-weight:700;line-height:.88;letter-spacing:-.01em;
+  text-transform:uppercase;margin-bottom:4rem;
+  color:var(--text);
+}
+.hero-title .line{display:block;overflow:hidden;}
+.hero-title .line span{display:block;transform:translateY(110%);}
+
+.hero-bottom{
+  display:flex;align-items:flex-end;
+  justify-content:space-between;gap:3rem;
+}
+/* fade-in text reveal (text-reveal-02) */
+.hero-desc{
+  font-family:var(--o);font-size:1.05rem;line-height:1.75;
+  color:var(--muted);max-width:480px;opacity:0;transform:translateY(14px);
+}
+.hero-meta{
+  display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;
+  opacity:0;
+}
+.hero-meta-item{
+  font-family:var(--t);font-size:.7rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--subtle);
+}
+.hero-meta-item strong{color:var(--text);}
+.hero-scroll{
+  position:absolute;bottom:3rem;left:50%;transform:translateX(-50%);
+  font-family:var(--t);font-size:.7rem;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--subtle);
+  display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  opacity:0;z-index:1;
+}
+.hero-scroll .scroll-line{
+  width:1px;height:40px;background:var(--border);
+  transform-origin:top;animation:scroll-pulse 2s ease-in-out infinite;
+}
+@keyframes scroll-pulse{0%,100%{transform:scaleY(1);opacity:1;}50%{transform:scaleY(0.5);opacity:0.4;}}
+
+/* ───── MARQUEE ───── */
+.marquee-wrap{
+  background:var(--dark);border-bottom:1px solid var(--dark);
+  padding:.8rem 0;overflow:hidden;
+}
+.marquee-track{
+  display:flex;gap:3rem;
+  animation:mq 20s linear infinite;width:max-content;
+}
+.marquee-item{
+  font-family:var(--t);font-size:.68rem;letter-spacing:.22em;
+  text-transform:uppercase;color:rgba(200,196,188,0.6);white-space:nowrap;
+}
+.marquee-sep{color:rgba(120,115,108,0.4);}
+@keyframes mq{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* ───── SECTION SHELL ───── */
+.section{padding:7rem 2.5rem;border-bottom:1px solid var(--border);}
+.section-meta{
+  display:flex;align-items:center;gap:.8rem;margin-bottom:4rem;
+}
+.curly{
+  font-family:var(--t);font-size:.68rem;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--subtle);
+  border:1px solid var(--border-l);padding:.25rem .6rem;
+}
+.section-heading{
+  font-family:var(--t);
+  font-size:clamp(3.2rem,8vw,9.5rem);
+  font-weight:700;line-height:.88;letter-spacing:-.01em;
+  text-transform:uppercase;margin-bottom:5rem;
+  overflow:hidden;color:var(--text);
+}
+.section-heading span{display:block;}
+
+/* ───── OVERVIEW ───── */
+.overview-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+}
+.overview-col{display:flex;flex-direction:column;}
+.overview-item{
+  padding:2.5rem 2.5rem 2.5rem 0;
+  border-bottom:1px solid var(--border);
+}
+.overview-col:last-child .overview-item{
+  padding:2.5rem 0 2.5rem 2.5rem;
+  border-left:1px solid var(--border);
+}
+.overview-item:last-child{border-bottom:none;}
+.ov-num{
+  font-family:var(--t);font-size:.68rem;letter-spacing:.18em;
+  color:var(--subtle);margin-bottom:.8rem;
+}
+.ov-title{
+  font-family:var(--t);font-size:1.4rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;
+}
+.ov-desc{
+  font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);
+}
+
+/* ───── PIPELINE ───── */
+.pipeline-list{display:flex;flex-direction:column;}
+.pipeline-step{
+  display:grid;grid-template-columns:3.5rem 1fr 1fr;
+  gap:2rem;padding:2.8rem 0;border-top:1px solid var(--border);
+  align-items:start;
+}
+.pipeline-step:last-child{border-bottom:1px solid var(--border);}
+.ps-num{font-family:var(--t);font-size:.68rem;letter-spacing:.15em;color:var(--subtle);padding-top:.25rem;}
+.ps-name{font-family:var(--t);font-size:1.7rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.1;}
+.ps-desc{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);}
+.ps-code{
+  font-family:'Courier New',monospace;font-size:.76rem;
+  background:var(--dark);color:rgba(200,196,188,.9);
+  padding:.85rem 1.1rem;margin-top:.8rem;line-height:1.7;
+  letter-spacing:.02em;display:block;
+}
+
+/* ───── MODEL ───── */
+.model-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;
+}
+.model-table{border:1px solid var(--border);width:100%;}
+.model-table-head{
+  background:var(--dark);padding:.85rem 1.2rem;
+  display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:.5rem;
+  border-bottom:1px solid var(--dark);
+}
+.mth{
+  font-family:var(--t);font-size:.65rem;letter-spacing:.18em;
+  text-transform:uppercase;color:rgba(180,175,165,.6);
+}
+.model-row{
+  display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;
+  gap:.5rem;padding:.75rem 1.2rem;
+  border-bottom:1px solid var(--border-l);
+}
+.model-row:last-child{border-bottom:none;}
+.model-row.active{background:rgba(90,82,72,.05);}
+.mtd{font-family:var(--o);font-size:.85rem;color:var(--text);}
+.mtd.label{font-family:var(--t);font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text);}
+.mtd.dim{color:var(--subtle);}
+.model-right{display:flex;flex-direction:column;gap:2.5rem;}
+.model-feature{display:flex;flex-direction:column;gap:.5rem;}
+.mf-label{font-family:var(--t);font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--subtle);}
+.mf-title{font-family:var(--t);font-size:1.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.mf-desc{font-family:var(--o);font-size:.9rem;line-height:1.75;color:var(--muted);}
+
+
+/* ───── HOW YOLO ───── */
+.how-yolo-steps{display:flex;flex-direction:column;gap:4rem;}
+.how-yolo-step{opacity:0;}
+.how-yolo-step h3{font-family:var(--t);font-size:1.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1.2rem;}
+.how-yolo-step p{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);max-width:600px;}
+.how-yolo-step .code-block{
+  font-family:'Courier New',monospace;font-size:.76rem;
+  background:var(--dark);color:rgba(200,196,188,.9);
+  padding:.85rem 1.1rem;margin-top:.8rem;line-height:1.7;
+  letter-spacing:.02em;display:block;
+}
+.how-yolo-step .code-block span{color:rgba(200,196,188,.9);}
+.how-yolo-num{
+  font-family:var(--t);font-size:.65rem;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--subtle);margin-bottom:.5rem;
+}
+.how-yolo-num span{color:var(--text);}
+.how-yolo-num::after{content:'.';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-num span::after{content:'.';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-num span::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-name{font-family:var(--t);font-size:1.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.6rem;}
+.how-yolo-name span{color:var(--text);}
+.how-yolo-name::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-name span::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-name::after{content:'';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-name span::after{content:'';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-name span::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-desc{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);max-width:600px;}
+.how-yolo-desc span{color:var(--text);}
+.how-yolo-desc::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-desc span::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-desc::after{content:'';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-desc span::after{content:'';margin-left:.2rem;color:var(--subtle);}
+.how-yolo-desc span::before{content:'';margin-right:.2rem;color:var(--subtle);}
+.how-yolo-desc span::after{content:'';margin-left:.2rem;color:var(--subtle);}
+
+/* ───── SEVERITY ───── */
+.severity-intro{
+  font-family:var(--o);font-size:1.05rem;line-height:1.75;
+  color:var(--muted);max-width:600px;margin-bottom:5rem;
+}
+.severity-cards{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+}
+.severity-card{
+  padding:3rem 2.5rem 3rem 0;
+  border-top:1px solid var(--border);
+  border-right:1px solid var(--border);
+}
+.severity-card:last-child{border-right:none;padding-right:0;}
+.severity-card:nth-child(2){padding-left:2.5rem;padding-right:2.5rem;}
+.severity-card:last-child{padding-left:2.5rem;}
+
+.crack-svg-wrap{
+  height:200px;display:flex;align-items:center;
+  justify-content:center;margin-bottom:2rem;
+  position:relative;
+}
+.crack-svg-wrap svg{overflow:visible;}
+.sev-badge{
+  font-family:var(--t);font-size:.65rem;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--subtle);margin-bottom:.4rem;
+}
+.sev-label{
+  font-family:var(--t);font-size:2.2rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:.3rem;
+}
+.sev-score{
+  font-family:var(--t);font-size:.82rem;letter-spacing:.1em;
+  color:var(--subtle);margin-bottom:.8rem;
+}
+.sev-desc{font-family:var(--o);font-size:.88rem;line-height:1.7;color:var(--muted);}
+
+/* crack paths get animated via JS */
+.crack-path{
+  fill:none;stroke-linecap:round;stroke-linejoin:round;
+}
+.crack-path.minor{stroke:rgba(80,72,64,.35);stroke-width:1.2;}
+.crack-path.moderate{stroke:rgba(80,72,64,.45);stroke-width:1.6;}
+.crack-path.severe{stroke:rgba(80,72,64,.55);stroke-width:2.2;}
+
+/* ───── TEMPORAL ───── */
+.temporal-block{
+  display:grid;grid-template-columns:1fr 1fr;gap:4rem;
+  align-items:start;margin-top:4rem;padding-top:4rem;
+  border-top:1px solid var(--border);
+}
+.temp-col{}
+.temp-heading{
+  font-family:var(--t);font-size:1.5rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:1.2rem;
+}
+.temp-desc{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);}
+.threshold-list{display:flex;flex-direction:column;gap:0;margin-top:1.5rem;}
+.threshold-item{
+  display:grid;grid-template-columns:5rem 1fr;gap:1rem;
+  padding:.8rem 0;border-top:1px solid var(--border-l);align-items:center;
+}
+.threshold-item:last-child{border-bottom:1px solid var(--border-l);}
+.threshold-val{
+  font-family:var(--t);font-size:1rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;
+}
+.threshold-desc{font-family:var(--o);font-size:.88rem;color:var(--muted);line-height:1.5;}
+
+/* ───── ARCHITECTURE (dark section, clip-path reveal) ───── */
+.arch-section{
+  padding:7rem 2.5rem;background:var(--dark);
+  color:rgba(220,215,205,.9);
+  border-bottom:1px solid #333;
+  clip-path:inset(100% 0 0 0);
+}
+.arch-section .curly{border-color:#444;color:rgba(150,145,135,.5);}
+.arch-section .section-heading{color:rgba(225,220,210,.9);}
+.arch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;}
+.arch-item{
+  padding:2.5rem 2rem 2.5rem 0;
+  border-top:1px solid #333;border-right:1px solid #333;
+}
+.arch-item:nth-child(3n){border-right:none;padding-right:0;}
+.arch-item:nth-child(3n+2){padding-left:2rem;padding-right:2rem;}
+.arch-item:nth-child(3n+0){padding-left:2rem;}
+.arch-item:nth-last-child(-n+3){border-bottom:none;}
+.ai-label{
+  font-family:var(--t);font-size:.65rem;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(120,115,108,.6);margin-bottom:.5rem;
+}
+.ai-title{
+  font-family:var(--t);font-size:1.35rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;
+  color:rgba(220,215,205,.9);margin-bottom:.6rem;
+}
+.ai-desc{font-family:var(--o);font-size:.88rem;line-height:1.75;color:rgba(130,125,118,.9);}
+
+/* ───── QUICKSTART ───── */
+.quickstart-section{background:var(--bg2);}
+.run-list{display:flex;flex-direction:column;max-width:820px;}
+.run-step{
+  display:grid;grid-template-columns:3.5rem 1fr;gap:2rem;
+  padding:2.8rem 0;border-top:1px solid var(--border);
+}
+.run-step:last-child{border-bottom:1px solid var(--border);}
+.rs-num{font-family:var(--t);font-size:.68rem;letter-spacing:.15em;color:var(--subtle);padding-top:.3rem;}
+.rs-body{display:flex;flex-direction:column;gap:.8rem;}
+.rs-title{font-family:var(--t);font-size:1.45rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.rs-desc{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);}
+.rs-code{
+  font-family:'Courier New',monospace;font-size:.76rem;
+  background:var(--dark);color:rgba(200,196,188,.9);
+  padding:.85rem 1.1rem;line-height:1.7;letter-spacing:.02em;display:block;
+}
+
+/* ───── FEATURES (hasque style, color fill hover) ───── */
+.feature-list{display:flex;flex-direction:column;}
+.feature-item{
+  display:grid;grid-template-columns:3.5rem 1fr;gap:2rem;
+  padding:2.5rem .4rem;border-top:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.feature-item:last-child{border-bottom:1px solid var(--border);}
+.feature-item::before{
+  content:'';position:absolute;inset:0;background:var(--dark);
+  transform:translateX(-101%);
+  transition:transform .4s cubic-bezier(.76,0,.24,1);z-index:0;
+}
+.feature-item:hover::before{transform:translateX(0);}
+.feature-item>*{position:relative;z-index:1;}
+.feature-item:hover .fi-num,
+.feature-item:hover .fi-title,
+.feature-item:hover .fi-desc,
+.feature-item:hover .fi-tag{color:rgba(220,215,205,.9);}
+.feature-item:hover .fi-tag{border-color:rgba(200,195,185,.4);}
+.fi-num{font-family:var(--t);font-size:.68rem;letter-spacing:.15em;color:var(--subtle);transition:color .3s;padding-top:.3rem;}
+.fi-body{display:flex;flex-direction:column;gap:.7rem;}
+.fi-header{display:flex;align-items:center;gap:.8rem;}
+.fi-title{font-family:var(--t);font-size:1.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;transition:color .3s;}
+.fi-tag{
+  font-family:var(--t);font-size:.6rem;letter-spacing:.18em;
+  text-transform:uppercase;border:1px solid var(--border);
+  padding:.18rem .5rem;color:var(--subtle);transition:color .3s,border-color .3s;
+}
+.fi-desc{font-family:var(--o);font-size:.93rem;line-height:1.75;color:var(--muted);max-width:680px;transition:color .3s;}
+
+/* ───── LIMITATIONS ───── */
+.limits-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;}
+.limit-item{
+  padding:2.5rem 2rem 2.5rem 0;
+  border-top:1px solid var(--border);border-right:1px solid var(--border);
+}
+.limit-item:nth-child(3n){border-right:none;padding-right:0;}
+.limit-item:nth-child(3n+2){padding:2.5rem 2rem;}
+.limit-item:nth-child(3n+0){padding:2.5rem 0 2.5rem 2rem;}
+.li-num{font-family:var(--t);font-size:.65rem;letter-spacing:.18em;color:var(--subtle);margin-bottom:.5rem;}
+.li-title{font-family:var(--t);font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;}
+.li-desc{font-family:var(--o);font-size:.88rem;line-height:1.7;color:var(--muted);}
+
+/* ───── FOOTER ───── */
+footer{padding:4.5rem 2.5rem;display:flex;align-items:flex-end;justify-content:space-between;}
+.footer-l{}
+.footer-logo{font-family:var(--t);font-size:.85rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;}
+.footer-sub{font-family:var(--o);font-size:.75rem;color:var(--subtle);margin-top:.35rem;line-height:1.7;}
+.footer-r{display:flex;flex-direction:column;align-items:flex-end;gap:.6rem;}
+.footer-top-link{
+  font-family:var(--t);font-size:.7rem;letter-spacing:.18em;
+  text-transform:uppercase;border:1px solid var(--border);
+  color:var(--muted);padding:.45rem .9rem;
+  position:relative;overflow:hidden;cursor:none;
+  transition:color .3s;
+}
+.footer-top-link::before{
+  content:'';position:absolute;inset:0;background:var(--dark);
+  transform:translateX(-101%);
+  transition:transform .3s cubic-bezier(.76,0,.24,1);z-index:-1;
+}
+.footer-top-link:hover::before{transform:translateX(0);}
+.footer-top-link:hover{color:var(--bg);}
+.footer-copy{font-family:var(--t);font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--subtle);}
+
+/* ───── CRACK DIVIDER ───── */
+.crack-divider{
+  width:100%;height:28px;overflow:visible;
+  display:block;
+}
+.crack-divider path{fill:none;stroke:var(--border);stroke-width:1;stroke-linecap:round;}
+
+/* ───── UTILITIES ───── */
+.fade-up{opacity:0;transform:translateY(18px);}
+.fade-in{opacity:0;}
+
+/* ───── HAMBURGER ───── */
+.nav-hamburger{
+  display:none;flex-direction:column;justify-content:center;gap:5px;
+  width:2rem;height:2rem;background:none;border:none;cursor:pointer;
+  padding:0;z-index:600;
+}
+.nav-hamburger span{
+  display:block;width:100%;height:1.5px;background:var(--text);
+  transition:transform .3s cubic-bezier(.76,0,.24,1),opacity .3s;
+}
+.nav-hamburger.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg);}
+.nav-hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0);}
+.nav-hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg);}
+
+.nav-drawer{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:var(--bg);z-index:490;
+  flex-direction:column;justify-content:center;align-items:flex-start;
+  padding:6rem 1.5rem 3rem;opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+}
+.nav-drawer.open{opacity:1;pointer-events:all;}
+.nav-drawer ul{list-style:none;display:flex;flex-direction:column;width:100%;}
+.nav-drawer ul li{border-bottom:1px solid var(--border);}
+.nav-drawer ul li a{
+  display:block;padding:1.1rem 0;
+  font-family:var(--t);font-size:1.75rem;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--text);
+}
+
+@media(max-width:900px){
+  nav{padding:1.2rem 1.5rem;}
+  .nav-links{gap:1rem;}
+  .hero{padding:7rem 1.5rem 3.5rem;}
+  .section{padding:5rem 1.5rem;}
+  .hero-bottom{flex-direction:column;align-items:flex-start;}
+  .pipeline-step{grid-template-columns:2.5rem 1fr;}
+  .pipeline-step > div:last-child{grid-column:1/-1;padding-left:4.5rem;}
+  .ps-desc{}
+  .model-grid,.temporal-block,.overview-grid{grid-template-columns:1fr;}
+  .overview-col:last-child .overview-item{padding:2rem 0;border-left:none;border-top:1px solid var(--border);}
+  .arch-grid,.limits-grid,.severity-cards{grid-template-columns:1fr;}
+  .severity-card{padding:2.5rem 0;border-right:none;border-bottom:1px solid var(--border);}
+  .arch-item{border-right:none;padding-left:0!important;padding-right:0!important;}
+  .limit-item{border-right:none;padding-left:0!important;padding-right:0!important;}
+}
+
+@media(max-width:600px){
+  /* ── Disable cursor on touch ── */
+  body{cursor:auto;}
+  #cur-ring,#cur-dot{display:none;}
+
+  /* ── Nav ── */
+  .nav-links{display:none;}
+  .nav-hamburger{display:flex;}
+  .nav-drawer{display:flex;}
+
+  /* ── Loader ── */
+  #loader-num,.loader-num{font-size:clamp(6rem,28vw,14rem);}
+  #loader-inner{padding:1.5rem 1.2rem;}
+
+  /* ── Hero ── */
+  .hero{padding:6rem 1.2rem 3rem;min-height:100svh;}
+  .hero-title{font-size:clamp(3.8rem,17vw,7rem);margin-bottom:2.5rem;}
+  .hero-bottom{flex-direction:column;align-items:flex-start;gap:1.5rem;}
+  .hero-desc{font-size:.95rem;max-width:100%;}
+  .hero-meta{align-items:flex-start;flex-direction:row;flex-wrap:wrap;gap:.5rem 1.4rem;}
+  .hero-scroll{display:none;}
+
+  /* ── Sections ── */
+  .section{padding:3.5rem 1.2rem;}
+  .section-heading{font-size:clamp(2.6rem,11vw,5rem);margin-bottom:2.5rem;}
+  .arch-section{padding:3.5rem 1.2rem;}
+
+  /* ── Overview ── */
+  .overview-grid{grid-template-columns:1fr;}
+  .overview-col:last-child .overview-item{padding:2rem 0;border-left:none;border-top:1px solid var(--border);}
+
+  /* ── Pipeline ── */
+  .pipeline-step{grid-template-columns:2rem 1fr;gap:1rem;padding:2rem 0;}
+  .pipeline-step > div:last-child{grid-column:1/-1;padding-left:3rem;min-width:0;}
+  .ps-desc{font-size:.88rem;min-width:0;word-break:break-word;}
+  .ps-name{font-size:1.25rem;min-width:0;}
+  .ps-code{font-size:.7rem;padding:.75rem .9rem;overflow-x:auto;white-space:pre;}
+
+  /* ── Model ── */
+  .model-grid{grid-template-columns:1fr;}
+  .model-table-head,.model-row{grid-template-columns:1.5fr 1fr 1fr;}
+  .model-table-head .mth:last-child,.model-row .mtd:last-child{display:none;}
+
+  /* ── How YOLO ── */
+  .how-yolo-steps{gap:2.5rem;}
+  .how-yolo-step p,.how-yolo-desc{font-size:.88rem;max-width:100%;min-width:0;word-break:break-word;}
+  .code-block,.how-yolo-step .code-block{font-size:.7rem;padding:.75rem .9rem;overflow-x:auto;white-space:pre;}
+  /* ── General grid child fix ── */
+  .pipeline-step > *,
+  .run-step > *,
+  .feature-item > *,
+  .overview-item,
+  .how-yolo-step {min-width:0;word-break:break-word;}
+
+  /* ── Severity ── */
+  .severity-cards{grid-template-columns:1fr;}
+  .severity-card{padding:2rem 0;border-right:none;border-bottom:1px solid var(--border);}
+  .crack-svg-wrap{height:150px;}
+
+  /* ── Temporal ── */
+  .temporal-block{grid-template-columns:1fr;gap:2rem;margin-top:2.5rem;padding-top:2.5rem;}
+
+  /* ── Architecture ── */
+  .arch-grid{grid-template-columns:1fr;}
+  .arch-item{border-right:none;padding:2rem 0!important;}
+
+  /* ── Quickstart ── */
+  .run-step{grid-template-columns:2rem 1fr;gap:1rem;padding:2rem 0;}
+  .rs-title{font-size:1.2rem;}
+  .rs-desc{font-size:.88rem;}
+  .rs-code{font-size:.7rem;padding:.75rem .9rem;overflow-x:auto;white-space:pre;}
+
+  /* ── Features ── */
+  .feature-item{grid-template-columns:2rem 1fr;gap:1rem;padding:1.8rem .2rem;}
+  .feature-item::before{display:none;}
+  .fi-title{font-size:1.25rem;}
+  .fi-desc{font-size:.88rem;}
+
+  /* ── Limitations ── */
+  .limits-grid{grid-template-columns:1fr;}
+  .limit-item{border-right:none;padding:2rem 0!important;}
+
+  /* ── Footer ── */
+  footer{flex-direction:column;align-items:flex-start;gap:1.5rem;padding:3rem 1.2rem;}
+  .footer-r{align-items:flex-start;}
+
+  /* ── Buttons: bigger tap targets ── */
+  .btn-fill{padding:.7rem 1.5rem;min-height:2.75rem;}
+  .btn-slide{height:auto;min-height:2.75rem;}
+  .btn-slide span{padding:.7rem 1.2rem;}
+}
+
+@media(max-width:380px){
+  .hero-title{font-size:clamp(3.2rem,15vw,5rem);}
+  .section-heading{font-size:clamp(2.2rem,10vw,4rem);}
+}
+
+/* ─── VID-TRIGGER + POPUP ─── */
+.vid-trigger {
+  border-bottom: 1px dashed rgba(100,95,88,.38);
+  cursor: none;
+  transition: border-color .2s, color .2s;
+  display: inline;
+}
+.vid-trigger:hover {
+  border-bottom-color: var(--text);
+}
+
+#vid-popup {
+  position: fixed;
+  width: 300px;
+  background: var(--dark);
+  border: 1px solid #3e3b38;
+  z-index: 9000;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.92) translateY(6px);
+  transition: opacity .22s cubic-bezier(.76,0,.24,1), transform .22s cubic-bezier(.76,0,.24,1);
+  top: 0; left: 0;
+}
+#vid-popup.show {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+#vid-popup-screen {
+  position: relative;
+  width: 100%;
+  height: 168px;
+  overflow: hidden;
+  background: #111;
+}
+#vid-popup-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+#vid-popup-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity .3s;
+}
+#vid-popup-video.loaded { opacity: 1; }
+#vid-popup-bar {
+  padding: .55rem .9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #333;
+}
+#vid-popup-name {
+  font-family: var(--t);
+  font-size: .6rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: rgba(180,175,165,.55);
+}
+#vid-popup-indicator {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-family: var(--t);
+  font-size: .55rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(120,115,108,.5);
+}
+#vid-popup-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(160,155,148,.4);
+  animation: vid-pulse 1.4s ease-in-out infinite;
+}
+@keyframes vid-pulse {
+  0%,100% { opacity: .4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+/* From Uiverse.io by vinodjangid07 */ 
+.Btn {
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background-color: transparent;
+  position: relative;
+  /* overflow: hidden; */
+  border-radius: 7px;
+  cursor: none;
+  transition: all .3s;
+}
+
+.svgContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  backdrop-filter: blur(0px);
+  letter-spacing: 0.8px;
+  border-radius: 10px;
+  transition: all .3s;
+  border: 1px solid rgba(156, 156, 156, 0.466);
+}
+
+.BG {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 100%;
+  background: #181818;
+  z-index: -1;
+  border-radius: 10px;
+  pointer-events: none;
+  transition: all .3s;
+}
+
+.Btn:hover .BG {
+  transform: rotate(35deg);
+  transform-origin: bottom;
+}
+
+.Btn:hover .svgContainer {
+  background-color: rgba(156, 156, 156, 0.466);
+  backdrop-filter: blur(4px);
+}
+
+
+</style>
+</head>
+<body>
+
+<!-- ═════════════════════════════════════════════════════
+     LOADER — Jack Elder style
+═════════════════════════════════════════════════════ -->
+<div id="loader">
+  <canvas id="loader-canvas"></canvas>
+  <div id="loader-inner">
+    <div id="loader-top">
+      <span class="loader-label">{ LOADING }</span>
+      <span class="loader-label">CRACKDETECT — YOLOv8</span>
+    </div>
+    <div id="loader-mid">
+      <span id="loader-num">0</span>
+      <span id="loader-pct">%</span>
+    </div>
+    <div id="loader-bottom">
+      <div class="loader-ticker">
+        <span class="loader-ticker-item">CRACK DETECTION</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">YOLOV8</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">SEVERITY ANALYSIS</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">VIDEO INSPECTION</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">TRANSFER LEARNING</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">CRACK DETECTION</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">YOLOV8</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">SEVERITY ANALYSIS</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">VIDEO INSPECTION</span>
+        <span class="loader-ticker-item">—</span>
+        <span class="loader-ticker-item">TRANSFER LEARNING</span>
+        <span class="loader-ticker-item">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CURSOR ═══ -->
+<div id="cur-ring"></div>
+<div id="cur-dot"></div>
+
+<!-- ═══ NAV ═══ -->
+<nav id="main-nav">
+  <a href="#" class="nav-logo">CRACK<span>DETECT</span></a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Toggle menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links">
+    <li><a href="#pipeline" class="btn-arrow">01 Pipeline<span class="arrow"> →</span></a></li>
+    <li><a href="#model" class="btn-arrow">02 Model<span class="arrow"> →</span></a></li>
+    <li><a href="#how-yolo-works" class="btn-arrow">03 How YOLO Works<span class="arrow"> →</span></a></li>
+    <li><a href="#severity" class="btn-arrow">04 Severity<span class="arrow"> →</span></a></li>
+    <li><a href="#architecture" class="btn-arrow">05 Architecture<span class="arrow"> →</span></a></li>
+    <li><a href="#features" class="btn-arrow">06 Capabilities<span class="arrow"> →</span></a></li>
+    <li>
+      <a href="#quickstart" class="btn-slide">
+        <div class="btn-slide-inner">
+          <span>{ 07 GET STARTED }</span>
+          <span>{ 07 GET STARTED }</span>
+        </div>
+      </a>
+    </li>
+    <li><a href="#limitations" class="btn-arrow">08 Limits<span class="arrow"> →</span></a></li>
+    <!-- From Uiverse.io by vinodjangid07 -->
+<a href="https://github.com/RealAdd97/CRACKDETECT" target="_blank">
+<button class="Btn">
+ <span class="svgContainer">
+   <svg fill="white" viewBox="0 0 496 512" height="1.6em"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+ </span>
+ <span class="BG"></span>
+</button></a>
+  </ul>
+</nav>
+
+
+<!-- MOBILE NAV DRAWER -->
+<div class="nav-drawer" id="nav-drawer" aria-hidden="true">
+  <ul>
+    <li><a href="#pipeline" class="drawer-link">01 Pipeline</a></li>
+    <li><a href="#model" class="drawer-link">02 Model</a></li>
+    <li><a href="#how-yolo-works" class="drawer-link">03 How YOLO Works</a></li>
+    <li><a href="#severity" class="drawer-link">04 Severity</a></li>
+    <li><a href="#architecture" class="drawer-link">05 Architecture</a></li>
+    <li><a href="#features" class="drawer-link">06 Capabilities</a></li>
+    <li><a href="#quickstart" class="drawer-link">07 Get Started</a></li>
+    <li><a href="#limitations" class="drawer-link">08 Limits</a></li>
+    <a href="https://github.com/RealAdd97/CRACKDETECT" target="_blank">
+<button class="Btn">
+ <span class="svgContainer">
+   <svg fill="white" viewBox="0 0 496 512" height="1.6em"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+ </span>
+ <span class="BG"></span>
+</button></a>
+  </ul>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="hero">
+  <svg id="hero-crack-svg" aria-hidden="true"></svg>
+  <div class="hero-content">
+    <div class="hero-eyebrow"><span>YOLOv8 Crack Detection System — Residential &amp; Commercial Inspection</span></div>
+    <h1 class="hero-title">
+      <div class="line"><span>Detect.</span></div>
+      <div class="line"><span>Classify.</span></div>
+      <div class="line"><span>Report.</span></div>
+    </h1>
+    <div class="hero-bottom">
+      <p class="hero-desc">
+        A computer vision pipeline that ingests inspection footage, detects structural cracks
+        frame-by-frame using a fine-tuned YOLOv8 model, applies temporal filtering to
+        reduce false positives, and outputs annotated video with severity-classified detection reports.
+      </p>
+      <div class="hero-meta">
+        <div class="hero-meta-item"><strong>1</strong> object class</div>
+        <div class="hero-meta-item"><strong>3</strong> severity levels</div>
+        <div class="hero-meta-item"><strong>5</strong> model sizes</div>
+        <div class="hero-meta-item"><strong>JSON + CSV</strong> output</div>
+      </div>
+    </div>
+    <div class="hero-scroll">
+      <span>{ SCROLL }</span>
+      <div class="scroll-line"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MARQUEE ═══ -->
+<div class="marquee-wrap" aria-hidden="true">
+  <div class="marquee-track">
+    <span class="marquee-item">Dataset Preparation</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">YOLOv8 Fine-Tuning</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Temporal Filtering</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Severity Heuristic</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Annotated Video</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Detection Reports</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Transfer Learning</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Dataset Preparation</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">YOLOv8 Fine-Tuning</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Temporal Filtering</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Severity Heuristic</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Annotated Video</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Detection Reports</span><span class="marquee-item marquee-sep">/</span>
+    <span class="marquee-item">Transfer Learning</span><span class="marquee-item marquee-sep">/</span>
+  </div>
+</div>
+
+<!-- ═══ PIPELINE ═══ -->
+<section class="section" id="pipeline">
+  <div class="section-meta">
+    <span class="curly">{ PIPELINE }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Three Scripts.</span></div>
+  <div class="pipeline-list">
+    <div class="pipeline-step fade-up">
+      <span class="ps-num">01</span>
+      <div class="ps-name">prepare_dataset.py</div>
+      <div>
+        <div class="ps-desc">Organizes raw images and YOLO-format label files into the required train/val split directory structure. Finds all supported image formats, shuffles with a fixed seed for reproducibility, copies images and corresponding label files into split directories, and generates the <code style="font-family:monospace;font-size:.85em">data.yaml</code> config file YOLO needs. Accepts a configurable validation fraction (default 0.2) and class names list.</div>
+        <span class="ps-code">python prepare_dataset.py \<br>  --images_dir /path/to/raw_images \<br>  --labels_dir /path/to/raw_labels \<br>  --output_dir ./dataset \<br>  --val_split 0.2 \<br>  --class_names crack</span>
+      </div>
+    </div>
+    <div class="pipeline-step fade-up">
+      <span class="ps-num">02</span>
+      <div class="ps-name">train.py</div>
+      <div>
+        <div class="ps-desc">Loads the specified pretrained YOLOv8 checkpoint and fine-tunes it on your crack dataset using transfer learning from COCO weights. Calls <code style="font-family:monospace;font-size:.85em">model.train()</code> via the Ultralytics API with configurable epochs, batch size, image size, learning rate, and IoU threshold. Saves the best and last checkpoints. After training, automatically runs validation and reports mAP50 and mAP50-95 metrics.</div>
+        <span class="ps-code">python train.py \<br>  --data ./dataset/data.yaml \<br>  --epochs 100 \<br>  --model yolov8n.pt</span>
+      </div>
+    </div>
+    <div class="pipeline-step fade-up">
+      <span class="ps-num">03</span>
+      <div class="ps-name">detect_video.py</div>
+      <div>
+        <div class="ps-desc">Loads the trained model weights and processes each input video frame-by-frame using streaming prediction. For every detection it extracts the bounding box, confidence, class, calculates a severity score from the combined size/confidence heuristic, and applies temporal filtering across consecutive frames. Outputs an <span class="vid-trigger" data-label="Annotated Output" data-video="web_ready_output.mp4">annotated video with drawn bounding boxes</span>, a JSON report, and a CSV report per input video. Supports batch processing of entire folders.</div>
+        <span class="ps-code">python detect_video.py \<br>  --model runs/detect/crack_yolo/weights/best.pt \<br>  --source inspection.mp4 \<br>  --output ./results</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MODEL ═══ -->
+<section class="section" id="model">
+  <div class="section-meta">
+    <span class="curly">{ MODEL }</span>
+  </div>
+  <div class="section-heading fade-up"><span>YOLOv8</span></div>
+  <div class="model-grid">
+    <div>
+      <div class="model-table fade-up">
+        <div class="model-table-head">
+          <span class="mth">Variant</span>
+          <span class="mth">Params</span>
+          <span class="mth">Speed</span>
+          <span class="mth">Use Case</span>
+        </div>
+        <div class="model-row">
+          <span class="mtd label">YOLOv8n</span>
+          <span class="mtd">3.2M</span>
+          <span class="mtd">Fast</span>
+          <span class="mtd dim">CPU / Edge</span>
+        </div>
+        <div class="model-row active">
+          <span class="mtd label">YOLOv8s</span>
+          <span class="mtd">11.2M</span>
+          <span class="mtd">Balanced</span>
+          <span class="mtd dim">Recommended</span>
+        </div>
+        <div class="model-row">
+          <span class="mtd label">YOLOv8m</span>
+          <span class="mtd">25.9M</span>
+          <span class="mtd">Moderate</span>
+          <span class="mtd dim">GPU preferred</span>
+        </div>
+        <div class="model-row">
+          <span class="mtd label">YOLOv8l</span>
+          <span class="mtd">43.7M</span>
+          <span class="mtd">Slow</span>
+          <span class="mtd dim">High accuracy</span>
+        </div>
+        <div class="model-row">
+          <span class="mtd label">YOLOv8x</span>
+          <span class="mtd">68.2M</span>
+          <span class="mtd">Slowest</span>
+          <span class="mtd dim">Max accuracy</span>
+        </div>
+      </div>
+      <div style="margin-top:1.5rem;padding:1.2rem 1.5rem;border:1px solid var(--border);">
+        <div style="font-family:var(--t);font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--subtle);margin-bottom:.5rem;">{ NOTE }</div>
+        <div style="font-family:var(--o);font-size:.85rem;line-height:1.7;color:var(--muted);">Start with <code style="font-family:monospace;font-size:.85em">yolov8n.pt</code> on a small subset to verify the pipeline before scaling to larger models or full datasets.</div>
+      </div>
+    </div>
+    <div class="model-right fade-up">
+      <div class="model-feature">
+        <div class="mf-label">{ TRANSFER LEARNING }</div>
+        <div class="mf-title">Pretrained COCO Weights</div>
+        <div class="mf-desc">All model variants start from weights pretrained on the COCO dataset, providing rich feature extraction from 80 object categories. Fine-tuning on crack images leverages these learned low-level features — edges, textures, shapes — meaning far fewer crack images are needed compared to training from scratch. Typically converges in 50–100 epochs.</div>
+      </div>
+      <div class="model-feature">
+        <div class="mf-label">{ DATA FORMAT }</div>
+        <div class="mf-title">YOLO Annotation Format</div>
+        <div class="mf-desc">Each image requires a paired plain-text label file. Each line encodes one object: <code style="font-family:monospace;font-size:.85em">class_id x_center y_center width height</code>, all normalized 0–1 relative to the image dimensions. For crack detection, class_id is always 0. LabelImg, CVAT, and Roboflow all export this format directly.</div>
+      </div>
+      <div class="model-feature">
+        <div class="mf-label">{ METRICS }</div>
+        <div class="mf-title">mAP50 and mAP50-95</div>
+        <div class="mf-desc">After training, the best model is automatically validated. mAP50 (mean Average Precision at 0.5 IoU threshold) is the primary metric for crack detection. mAP50-95 averages across IoU thresholds from 0.5 to 0.95, giving a stricter measure of localization accuracy. Monitor both via TensorBoard during training.</div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ═══ HOW YOLO WORKS ═══ -->
+<section class="section" id="how-yolo-works">
+  <div class="section-meta">
+    <span class="curly">{ HOW YOLO WORKS }</span>
+  </div>
+  <div class="section-heading fade-up"><span>How YOLO Works</span></div>
+  <p style="margin-bottom:2rem;">
+    YOLO (You Only Look Once) reframes object detection as a single regression problem, directly predicting bounding boxes and class probabilities from full images in one evaluation.
+  </p>
+  <div class="how-yolo-row">
+    <div class="how-yolo-steps">
+    <div class="how-yolo-step">
+		      <span class="how-yolo-num">01</span>
+		      <div class="how-yolo-name">Input & Backbone</div>
+		      <div>
+		        <div class="how-yolo-desc">An input image is passed through a convolutional neural network (e.g., Darknet 53, CSPNet, or EfficientNet) to extract a rich feature map.</div>
+		      </div>
+		    </div>
+		    <div class="how-yolo-step">
+		      <span class="how-yolo-num">02</span>
+		      <div class="how-yolo-name">Grid Creation</div>
+		      <div>
+		        <div class="how-yolo-desc">The feature map is split into an <em>S × S</em> grid (typical S = 13, 26, or 52). Each grid cell is responsible for detecting objects whose center falls within it.</div>
+		      </div>
+		    </div>
+		    <div class="how-yolo-step">
+		      <span class="how-yolo-num">03</span>
+		      <div class="how-yolo-name">Bounding Box Predictions</div>
+		      <div>
+		        <div class="how-yolo-desc">Each cell predicts B bounding boxes (usually B=2 or 3). For each box it predicts:
+		          <ul style="margin-top:0.3em; margin-bottom:0.3em; margin-left:1.5em; font-family:var(--o); font-size:.93rem; line-height:1.75; color:var(--muted);">
+		            <li><em>x, y</em>: center coordinates relative to the cell bounds</li>
+		            <li><em>w, h</em>: width and height relative to the whole image</li>
+		            <li>objectness score: probability that the box contains an object</li>
+		            <li>class probabilities: one per class (softmax over classes)</li>
+		          </ul>
+		        </div>
+		      </div>
+		    </div>
+		    <div class="how-yolo-step">
+		      <span class="how-yolo-num">04</span>
+		      <div class="how-yolo-name">Confidence Score</div>
+		      <div>
+		        <div class="how-yolo-desc">The final confidence for a box = objectness × class probability. This reflects both how likely the box contains an object and how accurate the predicted class is.</div>
+		      </div>
+		    </div>
+		    <div class="how-yolo-step">
+		      <span class="how-yolo-num">05</span>
+		      <div class="how-yolo-name">Non Maximum Suppression (NMS)</div>
+		      <div>
+		        <div class="how-yolo-desc">All predictions are filtered by a confidence threshold, then overlapping boxes of the same class are suppressed, keeping the highest scoring one.</div>
+		      </div>
+		    </div>
+		    <div class="how-yolo-step">
+		      <span class="how-yolo-num">06</span>
+		      <div class="how-yolo-name">Single Pass Inference</div>
+		      <div>
+		        <div class="how-yolo-desc">Because predictions come from one forward pass, YOLO runs at real time speeds (45 to 150 FPS on a GPU) while still leveraging the expressive power of deep CNNs.</div>
+		      </div>
+		    </div>
+		  </div>
+		  <div style="text-align:center; margin:2rem 0;">
+		    <svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg" style="max-width:100%; height:auto; border:1px solid var(--border); border-radius:4px; display:inline-block;">
+		      <!-- background -->
+		      <rect x="0" y="0" width="300" height="200" fill="#faf8f6" stroke="#c6c2ba" stroke-width="1"/>
+		      <!-- grid lines -->
+		      <g stroke="#e5e2db" stroke-width="0.5">
+		        <!-- vertical lines -->
+		        <line x1="60" y1="0" x2="60" y2="200"/>
+		        <line x1="120" y1="0" x2="120" y2="200"/>
+		        <line x1="180" y1="0" x2="180" y2="200"/>
+		        <line x1="240" y1="0" x2="240" y2="200"/>
+		        <!-- horizontal lines -->
+		        <line x1="0" y1="40" x2="300" y2="40"/>
+		        <line x1="0" y1="80" x2="300" y2="80"/>
+		        <line x1="0" y1="120" x2="300" y2="120"/>
+		        <line x1="0" y1="160" x2="300" y2="160"/>
+		      </g>
+		      <!-- example bounding boxes -->
+		      <rect x="50" y="30" width="80" height="60" fill="none" stroke="#252220" stroke-width="1.5"/>
+		      <rect x="180" y="110" width="60" height="50" fill="none" stroke="#252220" stroke-width="1.5"/>
+		      <rect x="200" y="50" width="40" height="30" fill="none" stroke="#252220" stroke-width="1.5"/>
+		      <!-- CNN block representation -->
+		      <rect x="10" y="10" width="40" height="30" fill="#e5e2db" stroke="#c6c2ba" stroke-width="1"/>
+		      <text x="12" y="28" font-family="'Ogg','Cormorant Garamond',Georgia,serif" font-size="10" fill="#201e1b">CNN</text>
+		    </svg>
+		    <p style="font-size:0.85rem; color:var(--muted); margin-top:0.5rem;">Figure: YOLO divides the image into a grid, each cell predicts bounding boxes and class probabilities.</p>
+		  </div>
+		</section>
+<!-- ═══ SEVERITY ═══ -->
+<section class="section" id="severity">
+  <div class="section-meta">
+    <span class="curly">{ SEVERITY }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Classification</span></div>
+  <p class="severity-intro fade-up">
+    The severity label is a <span class="vid-trigger" data-label="Severity Heuristic" data-video="web_ready_output10.mov">heuristic visual prominence indicator</span> for triaging inspection footage —
+    not a calibrated crack-width measurement. It combines a size-based score (60% weight) from the
+    normalized bounding box diagonal and the model's detection confidence (40% weight).
+  </p>
+
+  <div class="severity-cards">
+    <!-- MINOR -->
+    <div class="severity-card">
+      <div class="crack-svg-wrap">
+        <svg width="120" height="200" viewBox="0 0 120 200">
+          <path class="crack-path minor" id="cp-minor-1" d="M 60,5 L 57,28 L 63,52 L 59,78 L 64,105 L 60,132 L 58,158"/>
+          <path class="crack-path minor" id="cp-minor-2" d="M 63,52 L 74,64 L 71,82"/>
+          <path class="crack-path minor" id="cp-minor-3" d="M 59,78 L 48,90 L 50,102"/>
+        </svg>
+      </div>
+      <div class="sev-badge">{ SEVERITY LEVEL 01 }</div>
+      <div class="sev-label">Minor</div>
+      <div class="sev-score">Score &lt; 0.3</div>
+      <div class="sev-desc">Small or low-confidence detection. Hairline surface cracks, early-stage seam separation, or stress marks. Flag for monitoring but unlikely immediate structural concern.</div>
+    </div>
+
+    <!-- MODERATE -->
+    <div class="severity-card">
+      <div class="crack-svg-wrap">
+        <svg width="120" height="200" viewBox="0 0 120 200">
+          <path class="crack-path moderate" id="cp-mod-1" d="M 60,5 L 54,26 L 66,50 L 52,76 L 62,102 L 50,130 L 58,158 L 52,185"/>
+          <path class="crack-path moderate" id="cp-mod-2" d="M 66,50 L 82,62 L 90,80 L 84,102"/>
+          <path class="crack-path moderate" id="cp-mod-3" d="M 52,76 L 36,88 L 30,108 L 36,125"/>
+          <path class="crack-path moderate" id="cp-mod-4" d="M 62,102 L 76,110 L 80,128"/>
+        </svg>
+      </div>
+      <div class="sev-badge">{ SEVERITY LEVEL 02 }</div>
+      <div class="sev-label">Moderate</div>
+      <div class="sev-score">0.3 — 0.6</div>
+      <div class="sev-desc">Visible crack with branching or medium-width. Warrants professional inspection. Could indicate settling, moisture infiltration, or early structural movement in the substrate.</div>
+    </div>
+
+    <!-- SEVERE -->
+    <div class="severity-card">
+      <div class="crack-svg-wrap">
+        <svg width="120" height="200" viewBox="0 0 120 200">
+          <path class="crack-path severe" id="cp-sev-1" d="M 60,5 L 50,22 L 68,44 L 46,68 L 65,92 L 44,118 L 62,145 L 48,172 L 58,195"/>
+          <path class="crack-path severe" id="cp-sev-2" d="M 68,44 L 88,54 L 100,70 L 95,90 L 108,105"/>
+          <path class="crack-path severe" id="cp-sev-3" d="M 46,68 L 28,80 L 18,98 L 24,118 L 14,135"/>
+          <path class="crack-path severe" id="cp-sev-4" d="M 65,92 L 82,100 L 90,118 L 100,130"/>
+          <path class="crack-path severe" id="cp-sev-5" d="M 44,118 L 28,126 L 20,142 L 25,158"/>
+          <path class="crack-path severe" id="cp-sev-6" d="M 62,145 L 78,152 L 82,168 L 92,178"/>
+        </svg>
+      </div>
+      <div class="sev-badge">{ SEVERITY LEVEL 03 }</div>
+      <div class="sev-label">Severe</div>
+      <div class="sev-score">Score &gt; 0.6</div>
+      <div class="sev-desc">Large bounding box with high confidence. Structural or settlement crack with significant width or branching. Immediate professional assessment recommended. Do not use as sole basis for structural decisions.</div>
+    </div>
+  </div>
+
+  <div class="temporal-block">
+    <div class="temp-col fade-up">
+      <div class="temp-heading">Temporal Filtering</div>
+      <div class="temp-desc">
+        To reduce false positives in video, the detector tracks detections across consecutive frames.
+        A detection is only counted in the final output if it appears in a minimum number of recent
+        frames — the <code style="font-family:monospace;font-size:.85em">temporal_min_hits</code>
+        threshold. Spatial proximity matching (<code style="font-family:monospace;font-size:.85em">distance_threshold</code>)
+        links detections across frames to the same physical crack. Flicker detections from noise,
+        compression artifacts, or brief occlusions are suppressed.
+      </div>
+    </div>
+    <div class="temp-col fade-up">
+      <div class="temp-heading">Severity Formula</div>
+      <div class="threshold-list">
+        <div class="threshold-item">
+          <span class="threshold-val">60%</span>
+          <span class="threshold-desc">Size score — normalized diagonal of bounding box relative to full frame diagonal</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-val">40%</span>
+          <span class="threshold-desc">Confidence score — model's raw detection confidence for that bounding box</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-val">&lt; 0.3</span>
+          <span class="threshold-desc">Minor — small or low-confidence, monitor</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-val">0.3–0.6</span>
+          <span class="threshold-desc">Moderate — professional inspection recommended</span>
+        </div>
+        <div class="threshold-item">
+          <span class="threshold-val">&gt; 0.6</span>
+          <span class="threshold-desc">Severe — immediate assessment required</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE (dark section, section-transition clip-path) ═══ -->
+<section class="arch-section" id="architecture">
+  <div class="section-meta">
+    <span class="curly">{ ARCHITECTURE }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Code Structure</span></div>
+  <div class="arch-grid">
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ SCRIPT 01 }</div>
+      <div class="ai-title">prepare_dataset.py</div>
+      <div class="ai-desc">Four core functions: <code style="font-family:monospace;font-size:.85em">find_images()</code> locates all supported formats, <code style="font-family:monospace;font-size:.85em">split_train_val()</code> shuffles and divides with a fixed seed, <code style="font-family:monospace;font-size:.85em">copy_split()</code> copies image/label pairs to output directories, and <code style="font-family:monospace;font-size:.85em">write_data_yaml()</code> creates the YOLO config. If no labels directory is provided, only images are organized.</div>
+    </div>
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ SCRIPT 02 }</div>
+      <div class="ai-title">train.py</div>
+      <div class="ai-desc">Parses CLI arguments, instantiates the YOLOv8 model via the Ultralytics YOLO class, calls <code style="font-family:monospace;font-size:.85em">model.train()</code> with the specified parameters, then calls <code style="font-family:monospace;font-size:.85em">model.val()</code> on the best checkpoint. Training runs save to <code style="font-family:monospace;font-size:.85em">runs/detect/crack_yolo/</code>. Checkpoints: <code style="font-family:monospace;font-size:.85em">weights/best.pt</code> and <code style="font-family:monospace;font-size:.85em">weights/last.pt</code>.</div>
+    </div>
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ SCRIPT 03 }</div>
+      <div class="ai-title">detect_video.py</div>
+      <div class="ai-desc">Streams frames via OpenCV <code style="font-family:monospace;font-size:.85em">VideoCapture</code>, runs YOLO prediction in streaming mode, applies the size-confidence severity heuristic per detection, applies temporal filtering across frame history, writes annotated frames back via <code style="font-family:monospace;font-size:.85em">VideoWriter</code>, and exports JSON and CSV reports with per-detection metadata.</div>
+    </div>
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ FORMAT }</div>
+      <div class="ai-title">Dataset Output</div>
+      <div class="ai-desc">The <code style="font-family:monospace;font-size:.85em">prepare_dataset.py</code> script creates: <code style="font-family:monospace;font-size:.85em">dataset/images/train/</code>, <code style="font-family:monospace;font-size:.85em">dataset/images/val/</code>, <code style="font-family:monospace;font-size:.85em">dataset/labels/train/</code>, <code style="font-family:monospace;font-size:.85em">dataset/labels/val/</code>, and <code style="font-family:monospace;font-size:.85em">dataset/data.yaml</code> pointing to these paths with the class names list.</div>
+    </div>
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ OUTPUT }</div>
+      <div class="ai-title">Detection Reports</div>
+      <div class="ai-desc">Each video produces three files: <code style="font-family:monospace;font-size:.85em">{name}_annotated.mp4</code> with <span class="vid-trigger" data-label="Frame-by-Frame Detection" data-video="web_ready_output2.mp4">bounding boxes drawn on every frame</span>, <code style="font-family:monospace;font-size:.85em">{name}_report.json</code> with all detections indexed, and <code style="font-family:monospace;font-size:.85em">{name}_report.csv</code> for analysis in spreadsheet tools. Each record includes frame number, timestamp, confidence, bbox coords, dimensions, and severity.</div>
+    </div>
+    <div class="arch-item fade-up">
+      <div class="ai-label">{ MONITORING }</div>
+      <div class="ai-title">TensorBoard</div>
+      <div class="ai-desc">Ultralytics logs training metrics to <code style="font-family:monospace;font-size:.85em">runs/detect/crack_yolo/</code> in TensorBoard format. Launch with <code style="font-family:monospace;font-size:.85em">tensorboard --logdir runs/detect</code> to visualize loss curves, mAP progression, precision, recall, and confusion matrix throughout training in real time.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="section" id="features">
+  <div class="section-meta">
+    <span class="curly">{ CAPABILITIES }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Features</span></div>
+  <div class="feature-list">
+    <div class="feature-item">
+      <span class="fi-num">01</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">GPU and CPU Support</div><span class="fi-tag">Runtime</span></div>
+        <div class="fi-desc">All three scripts work on CPU-only machines, with GPU (NVIDIA CUDA) recommended for training and faster inference. Specify <code style="font-family:monospace;font-size:.85em">--device 0</code> for the first NVIDIA GPU, or <code style="font-family:monospace;font-size:.85em">--device cpu</code> to force CPU. YOLOv8n is the recommended starting point for CPU-only environments.</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <span class="fi-num">02</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">Batch Video Processing</div><span class="fi-tag">Detection</span></div>
+        <div class="fi-desc">Pass a folder path to <code style="font-family:monospace;font-size:.85em">--source</code> and the detector processes every video file in that directory, generating annotated video, JSON, and CSV outputs for each one. Use <code style="font-family:monospace;font-size:.85em">--no_save_video</code> to skip annotated video generation and run significantly faster when you only need the detection reports.</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <span class="fi-num">03</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">Configurable Thresholds</div><span class="fi-tag">Detection</span></div>
+        <div class="fi-desc">Detection confidence threshold (<code style="font-family:monospace;font-size:.85em">--conf</code>, default 0.25), IoU threshold for NMS (<code style="font-family:monospace;font-size:.85em">--iou</code>), temporal minimum hits, and spatial distance threshold are all configurable at runtime. Tune these based on your precision/recall requirements and video characteristics.</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <span class="fi-num">04</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">Labeled Bounding Boxes</div><span class="fi-tag">Output</span></div>
+        <div class="fi-desc">The annotated video <span class="vid-trigger" data-label="Bounding Box Output" data-video="web_ready_output3.mp4">draws bounding boxes around every detected crack</span> with the confidence score and severity level labeled in each box. Uses OpenCV drawing primitives. Color-coding by severity is supported via configuration. The annotation is written to a new video file, preserving the original source file.</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <span class="fi-num">05</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">Reproducible Dataset Splits</div><span class="fi-tag">Training</span></div>
+        <div class="fi-desc">The train/val split uses a fixed random seed ensuring the same images always end up in the same split. This means training runs are reproducible, validation results are comparable across model sizes, and you can safely re-run <code style="font-family:monospace;font-size:.85em">prepare_dataset.py</code> without reshuffling previously split data.</div>
+      </div>
+    </div>
+    <div class="feature-item">
+      <span class="fi-num">06</span>
+      <div class="fi-body">
+        <div class="fi-header"><div class="fi-title">Early Stopping</div><span class="fi-tag">Training</span></div>
+        <div class="fi-desc">Use the <code style="font-family:monospace;font-size:.85em">patience</code> parameter to stop training automatically when the validation metric stops improving for a specified number of epochs. Prevents overfitting without manual monitoring. Combined with TensorBoard visualization, this keeps training efficient and prevents wasted compute on models that have already converged.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ QUICKSTART ═══ -->
+<section class="section quickstart-section" id="quickstart">
+  <div class="section-meta">
+    <span class="curly">{ QUICKSTART }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Get Running</span></div>
+  <div class="run-list">
+    <div class="run-step fade-up">
+      <span class="rs-num">01</span>
+      <div class="rs-body">
+        <div class="rs-title">Install Requirements</div>
+        <div class="rs-desc">Install the four required packages. Ultralytics bundles PyTorch as a dependency — it will install the CPU or CUDA version appropriate for your system. OpenCV handles video capture and frame writing. NumPy handles array operations throughout.</div>
+        <span class="rs-code">pip install -r requirements.txt<br><br># requirements.txt contains:<br># ultralytics  opencv-python  PyYAML  tqdm  numpy</span>
+      </div>
+    </div>
+    <div class="run-step fade-up">
+      <span class="rs-num">02</span>
+      <div class="rs-body">
+        <div class="rs-title">Prepare Your Dataset</div>
+        <div class="rs-desc">Annotate crack images using LabelImg, CVAT, or Roboflow — all export YOLO format directly. Aim for at least a few hundred labeled examples covering different crack types (hairline, structural, stair-step, settlement), surfaces (drywall, concrete, brick, stucco), and lighting conditions. Include images without cracks to reduce false positives.</div>
+        <span class="rs-code">python prepare_dataset.py \<br>  --images_dir ./raw_images \<br>  --labels_dir ./raw_labels \<br>  --output_dir ./dataset \<br>  --val_split 0.2</span>
+      </div>
+    </div>
+    <div class="run-step fade-up">
+      <span class="rs-num">03</span>
+      <div class="rs-body">
+        <div class="rs-title">Train the Model</div>
+        <div class="rs-desc">Start with <code style="font-family:monospace;font-size:.85em">yolov8n.pt</code> and 50 epochs to verify your pipeline before committing to a full run. Monitor via TensorBoard. If training diverges, try lowering <code style="font-family:monospace;font-size:.85em">--lr0</code>. If GPU memory runs out, reduce <code style="font-family:monospace;font-size:.85em">--batch</code>. Upgrade to <code style="font-family:monospace;font-size:.85em">yolov8s.pt</code> or larger when you have adequate GPU resources.</div>
+        <span class="rs-code">python train.py \<br>  --data ./dataset/data.yaml \<br>  --epochs 100 \<br>  --model yolov8s.pt \<br>  --batch 16 \<br>  --imgsz 640</span>
+      </div>
+    </div>
+    <div class="run-step fade-up">
+      <span class="rs-num">04</span>
+      <div class="rs-body">
+        <div class="rs-title">Run Detection</div>
+        <div class="rs-desc">Point the detector at your trained weights and inspection video. Start with the default confidence threshold of 0.25 — lower it if you're missing cracks, raise it to reduce false positives. The detector prints a per-video summary of total detections and severity breakdown to console.</div>
+        <span class="rs-code">python detect_video.py \<br>  --model runs/detect/crack_yolo/weights/best.pt \<br>  --source ./inspection_videos \<br>  --output ./results \<br>  --conf 0.25</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ LIMITATIONS ═══ -->
+<section class="section" id="limitations">
+  <div class="section-meta">
+    <span class="curly">{ LIMITATIONS }</span>
+  </div>
+  <div class="section-heading fade-up"><span>Disclaimer</span></div>
+  <p style="font-family:var(--o);font-size:1.05rem;line-height:1.75;color:var(--muted);max-width:680px;margin-bottom:5rem;" class="fade-up">
+    This tool is designed for automated screening and triage of inspection footage. It is not a
+    replacement for professional structural engineering assessment. The following limitations apply.
+  </p>
+  <div class="limits-grid">
+    <div class="limit-item fade-up">
+      <div class="li-num">01</div>
+      <div class="li-title">Not a Measurement Tool</div>
+      <div class="li-desc">Severity classification is heuristic and based on visual prominence in the frame. It does not measure physical crack width, depth, or rate of growth. Do not use severity scores to make structural load decisions without professional on-site measurement.</div>
+    </div>
+    <div class="limit-item fade-up">
+      <div class="li-num">02</div>
+      <div class="li-title">Lighting Dependent</div>
+      <div class="li-desc">Performance degrades in extreme lighting — deep shadows, direct glare, overexposure, or very low ambient light. Collect training data that matches the lighting conditions of your deployment environment, including edge cases.</div>
+    </div>
+    <div class="limit-item fade-up">
+      <div class="li-num">03</div>
+      <div class="li-title">Feature Confusion</div>
+      <div class="li-desc">The model may confuse cracks with visually similar features: expansion joints, tile grout lines, painted seams, or wood grain patterns. Include similar-looking non-crack examples in training data and use negative examples to reduce false positive rates on specific surfaces.</div>
+    </div>
+    <div class="limit-item fade-up">
+      <div class="li-num">04</div>
+      <div class="li-title">Video Quality</div>
+      <div class="li-desc">Heavily compressed video, low resolution, motion blur, or narrow codec bitrates significantly reduce detection accuracy. For best results, use camera stabilization, adequate resolution (1080p minimum recommended), and high-quality codec settings during footage capture.</div>
+    </div>
+    <div class="limit-item fade-up">
+      <div class="li-num">05</div>
+      <div class="li-title">Training Data Required</div>
+      <div class="li-desc">The model must be fine-tuned on crack images representative of your target surfaces and conditions. A generic pretrained COCO model has no crack-specific knowledge. Minimum a few hundred labeled images is needed; 1,000+ labeled examples gives substantially better performance.</div>
+    </div>
+    <div class="limit-item fade-up">
+      <div class="li-num">06</div>
+      <div class="li-title">Screening Only</div>
+      <div class="li-desc">For cracks flagged as severe, or any crack on load-bearing structures, consult a licensed structural engineer or inspector. This tool is for initial triage and reporting, not final assessment. Do not use output reports as sole documentation for insurance, legal, or safety-critical decisions.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-l">
+    <div class="footer-logo">CRACKDETECT — YOLOv8</div>
+    <div class="footer-sub">Python 3.9+ · Ultralytics · OpenCV · PyYAML · NumPy<br>For screening and triage only. Not a structural engineering tool.</div>
+  </div>
+  <div class="footer-r">
+    <a href="#hero" class="footer-top-link">{ BACK TO TOP }</a>
+    <div class="footer-copy">2026 · Crack Detection System</div>
+  </div>
+</footer>
+
+<!-- ═════════════════════════════════════════════════════
+     SCRIPTS
+═════════════════════════════════════════════════════ -->
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// ─── SEEDED RANDOM ───
+function seededRng(seed) {
+  let s = seed;
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+}
+
+// ─── CRACK PATH GENERATOR ───
+function buildCrackPaths(ox, oy, angle, length, rng, depth) {
+  if (depth > 3 || length < 20) return [];
+  const paths = [];
+  const pts = [[ox, oy]];
+  let x = ox, y = oy, a = angle, rem = length;
+  const branches = [];
+
+  while (rem > 5) {
+    const step = Math.min(11 + rng() * 12, rem);
+    a += (rng() - 0.5) * 22;
+    if (rng() < 0.09) a += (rng() > 0.5 ? 1 : -1) * 44;
+    x += Math.cos(a * Math.PI / 180) * step;
+    y += Math.sin(a * Math.PI / 180) * step;
+    pts.push([x, y]);
+    rem -= step;
+    if (rng() < 0.14 && depth < 2 && rem > 35) {
+      branches.push({x, y, a: a + (rng() > 0.5 ? 1 : -1) * (38 + rng() * 28), l: length * 0.44});
+    }
+  }
+
+  const d = 'M ' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L ');
+  paths.push(d);
+  for (const b of branches) {
+    paths.push(...buildCrackPaths(b.x, b.y, b.a, b.l, rng, depth + 1));
+  }
+  return paths;
+}
+
+// ─── HERO SVG CRACKS ───
+function buildHeroCracks() {
+  const svg = document.getElementById('hero-crack-svg');
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const rng = seededRng(42);
+  const origins = [
+    {x: vw * 0.48, y: vh * 0.42, a: -35, l: Math.hypot(vw, vh) * 0.48},
+    {x: vw * 0.48, y: vh * 0.42, a: 55, l: Math.hypot(vw, vh) * 0.42},
+    {x: vw * 0.48, y: vh * 0.42, a: 145, l: Math.hypot(vw, vh) * 0.38},
+    {x: vw * 0.48, y: vh * 0.42, a: -130, l: Math.hypot(vw, vh) * 0.4},
+    {x: vw * 0.48, y: vh * 0.42, a: -80, l: Math.hypot(vw, vh) * 0.3},
+  ];
+  const allPaths = [];
+  for (const o of origins) allPaths.push(...buildCrackPaths(o.x, o.y, o.a, o.l, rng, 0));
+
+  for (let i = 0; i < allPaths.length; i++) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    el.setAttribute('d', allPaths[i]);
+    el.setAttribute('stroke', 'rgba(80,70,58,0.14)');
+    el.setAttribute('stroke-width', '1.3');
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke-linecap', 'round');
+    el.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(el);
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = len;
+    el.style.strokeDashoffset = len;
+  }
+}
+
+// ─── LOADER CANVAS CRACKS ───
+class LoaderCrackCanvas {
+  constructor() {
+    this.canvas = document.getElementById('loader-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.segs = [];
+    this.totalLen = 0;
+    this.rng = seededRng(77);
+    this.resize();
+    this.generate();
+  }
+
+  resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+  }
+
+  generate() {
+    const vw = this.canvas.width, vh = this.canvas.height;
+    const cx = vw / 2, cy = vh / 2;
+    const arms = [
+      {a: -30, l: Math.hypot(vw, vh) * 0.55},
+      {a: 45,  l: Math.hypot(vw, vh) * 0.50},
+      {a: 130, l: Math.hypot(vw, vh) * 0.48},
+      {a: -130,l: Math.hypot(vw, vh) * 0.52},
+      {a: -80, l: Math.hypot(vw, vh) * 0.42},
+      {a: 90,  l: Math.hypot(vw, vh) * 0.40},
+    ];
+    for (const arm of arms) this.addSeg(cx, cy, arm.a, arm.l, 0);
+  }
+
+  addSeg(x, y, angle, length, depth) {
+    if (depth > 3 || length < 25) return;
+    const pts = [[x, y]];
+    let cx = x, cy = y, a = angle, rem = length;
+    const branches = [];
+
+    while (rem > 5) {
+      const step = Math.min(11 + this.rng() * 11, rem);
+      a += (this.rng() - 0.5) * 20;
+      if (this.rng() < 0.09) a += (this.rng() > 0.5 ? 1 : -1) * 42;
+      cx += Math.cos(a * Math.PI / 180) * step;
+      cy += Math.sin(a * Math.PI / 180) * step;
+      pts.push([cx, cy]);
+      rem -= step;
+      if (this.rng() < 0.13 && depth < 2 && rem > 40) {
+        branches.push({x: cx, y: cy, a: a + (this.rng() > 0.5 ? 1 : -1) * (36 + this.rng() * 26), l: length * 0.46});
+      }
+    }
+
+    let segLen = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
+      segLen += Math.hypot(dx, dy);
+    }
+    this.segs.push({pts, startAt: this.totalLen, length: segLen});
+    this.totalLen += segLen;
+    for (const b of branches) this.addSeg(b.x, b.y, b.a, b.l, depth + 1);
+  }
+
+  draw(progress) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const drawn = progress * this.totalLen;
+    ctx.strokeStyle = 'rgba(160,150,138,0.5)';
+    ctx.lineWidth = 1.1;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const seg of this.segs) {
+      if (seg.startAt >= drawn) break;
+      const segP = Math.min(1, (drawn - seg.startAt) / seg.length);
+      ctx.beginPath();
+      ctx.moveTo(seg.pts[0][0], seg.pts[0][1]);
+      let cum = 0;
+      for (let i = 1; i < seg.pts.length; i++) {
+        const dx = seg.pts[i][0] - seg.pts[i-1][0], dy = seg.pts[i][1] - seg.pts[i-1][1];
+        const plen = Math.hypot(dx, dy);
+        const target = segP * seg.length;
+        if (cum + plen >= target) {
+          const t = (target - cum) / plen;
+          ctx.lineTo(seg.pts[i-1][0] + dx * t, seg.pts[i-1][1] + dy * t);
+          break;
+        }
+        ctx.lineTo(seg.pts[i][0], seg.pts[i][1]);
+        cum += plen;
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+// ─── SEVERITY CRACK ANIMATION ───
+function animateSeverityCracks() {
+  document.querySelectorAll('.crack-path').forEach((path, i) => {
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    ScrollTrigger.create({
+      trigger: '#severity',
+      start: 'top 65%',
+      toggleActions: 'play none none reverse',
+      onEnter: () => {
+        gsap.to(path, {
+          strokeDashoffset: 0,
+          duration: 1.1 + i * 0.15,
+          delay: i * 0.08,
+          ease: 'power2.inOut'
+        });
+      },
+      once: true
+    });
+  });
+}
+
+// ─── CURSOR ───
+const ring = document.getElementById('cur-ring');
+const dot  = document.getElementById('cur-dot');
+let mX = window.innerWidth / 2, mY = window.innerHeight / 2;
+let rX = mX, rY = mY;
+
+document.addEventListener('mousemove', e => {
+  mX = e.clientX; mY = e.clientY;
+  gsap.to(dot, {x: mX, y: mY, duration: 0.05, ease: 'none'});
+});
+gsap.ticker.add(() => {
+  rX += (mX - rX) * 0.12;
+  rY += (mY - rY) * 0.12;
+  gsap.set(ring, {x: rX, y: rY});
+});
+document.querySelectorAll('a, button, .feature-item, .severity-card').forEach(el => {
+  el.addEventListener('mouseenter', () => ring.classList.add('expand'));
+  el.addEventListener('mouseleave', () => ring.classList.remove('expand'));
+});
+
+// ─── BOOT SEQUENCE ───
+const loaderCracks = new LoaderCrackCanvas();
+buildHeroCracks();
+
+// Animate loader counter + cracks
+const loaderNum = document.getElementById('loader-num');
+let counterObj = {val: 0};
+gsap.to(counterObj, {
+  val: 100,
+  duration: 1.8,
+  ease: 'power1.inOut',
+  onUpdate: () => {
+    const v = Math.floor(counterObj.val);
+    loaderNum.textContent = v;
+    loaderCracks.draw(counterObj.val / 100);
+  },
+  onComplete: () => {
+    // Loader exit — slides up
+    gsap.to('#loader', {
+      yPercent: -102,
+      duration: 0.9,
+      ease: 'power3.inOut',
+      delay: 0.25,
+      onComplete: () => {
+        document.getElementById('loader').style.display = 'none';
+        startHeroAnimations();
+      }
+    });
+  }
+});
+
+// ─── HERO ANIMATIONS (after loader) ───
+function startHeroAnimations() {
+  // Nav fade in
+  gsap.to('#main-nav', {opacity: 1, y: 0, duration: 0.7, ease: 'power3.out'});
+
+  // Eyebrow slide up
+  gsap.to('.hero-eyebrow span', {y: 0, duration: 0.7, ease: 'power3.out', delay: 0.05});
+
+  // Title lines — slide up stagger (text-reveal-01)
+  gsap.to('.hero-title .line span', {
+    y: 0,
+    duration: 1.1,
+    ease: 'power4.out',
+    stagger: 0.1,
+    delay: 0.1
+  });
+
+  // Desc + meta fade in (text-reveal-02)
+  gsap.to('.hero-desc', {opacity: 1, y: 0, duration: 0.85, ease: 'power3.out', delay: 0.5});
+  gsap.to('.hero-meta', {opacity: 1, duration: 0.7, ease: 'power3.out', delay: 0.65});
+  gsap.to('.hero-scroll', {opacity: 1, duration: 0.7, ease: 'power3.out', delay: 0.8});
+
+  // Hero SVG cracks animate after title
+  document.querySelectorAll('#hero-crack-svg path').forEach((path, i) => {
+    gsap.to(path, {
+      strokeDashoffset: 0,
+      duration: 1.4 + i * 0.12,
+      delay: 0.6 + i * 0.06,
+      ease: 'power2.inOut'
+    });
+  });
+
+  // Init rest of scroll animations
+  initScrollAnimations();
+}
+
+// ─── SCROLL ANIMATIONS ───
+function initScrollAnimations() {
+  // Section-transition clip-path reveal for arch section (section-transition-01)
+  ScrollTrigger.create({
+    trigger: '.arch-section',
+    start: 'top 88%',
+    toggleActions: 'play none none reverse',
+    onEnter: () => {
+      gsap.to('.arch-section', {
+        clipPath: 'inset(0% 0 0 0)',
+        duration: 1.05,
+        ease: 'power3.inOut'
+      });
+    },
+    once: true
+  });
+
+  // Fade-up elements (text-reveal-02)
+  gsap.utils.toArray('.fade-up').forEach((el, i) => {
+    gsap.fromTo(el,
+      {opacity: 0, y: 20},
+      {opacity: 1, y: 0, duration: 0.72, ease: 'power3.out',
+       delay: (i % 3) * 0.04,
+       scrollTrigger: {trigger: el, start: 'top 87%',toggleActions: 'play none none reverse'}}
+    );
+  });
+
+  // Pipeline steps
+  gsap.utils.toArray('.pipeline-step').forEach(step => {
+    gsap.fromTo(step,
+      {opacity: 0, y: 14},
+      {opacity: 1, y: 0, duration: 0.62, ease: 'power3.out',
+       scrollTrigger: {trigger: step, start: 'top 88%', toggleActions: 'play none none reverse'}}
+    );
+  });
+
+  // Feature items
+  gsap.utils.toArray('.feature-item').forEach(item => {
+    gsap.fromTo(item,
+      {opacity: 0},
+      {opacity: 1, duration: 0.55, ease: 'power2.out',
+       scrollTrigger: {trigger: item, start: 'top 90%', toggleActions: 'play none none reverse'}}
+    );
+  });
+
+  // Arch items in dark section
+  gsap.utils.toArray('.arch-item').forEach((item, i) => {
+    gsap.fromTo(item,
+      {opacity: 0, y: 12},
+      {opacity: 1, y: 0, duration: 0.65, ease: 'power3.out',
+       delay: (i % 3) * 0.1,
+       scrollTrigger: {trigger: item, start: 'top 88%', toggleActions: 'play none none reverse'}}
+    );
+  });
+		  // How YOLO steps
+		  gsap.utils.toArray('.how-yolo-step').forEach((step, i) => {
+		    gsap.fromTo(step,
+		      {opacity: 0, y: 10},
+		      {opacity: 1, y: 0, duration: 0.6, ease: 'power2.out',
+		       scrollTrigger: {trigger: step, start: 'top 88%', toggleActions: 'play none none reverse'}}
+		    );
+		  });
+  // Other items
+  ['overview-item','run-step','limit-item','severity-card','model-feature','threshold-item'].forEach(cls => {
+    gsap.utils.toArray('.' + cls).forEach((el, i) => {
+      gsap.fromTo(el,
+        {opacity: 0, y: 10},
+        {opacity: 1, y: 0, duration: 0.58, ease: 'power3.out',
+         delay: (i % 4) * 0.07,
+         scrollTrigger: {trigger: el, start: 'top 90%', toggleActions: 'play none none reverse'}}
+      );
+    });
+  });
+
+  animateSeverityCracks();
+}
+
+// ─── HAMBURGER / MOBILE DRAWER ───
+const hamburger = document.getElementById('nav-hamburger');
+const drawer = document.getElementById('nav-drawer');
+let drawerOpen = false;
+function toggleDrawer(open) {
+  drawerOpen = open;
+  hamburger.classList.toggle('open', open);
+  drawer.classList.toggle('open', open);
+  hamburger.setAttribute('aria-expanded', open);
+  drawer.setAttribute('aria-hidden', !open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+hamburger.addEventListener('click', () => toggleDrawer(!drawerOpen));
+drawer.querySelectorAll('.drawer-link').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    toggleDrawer(false);
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) window.scrollTo({top: target.getBoundingClientRect().top + window.scrollY - 72, behavior: 'smooth'});
+  });
+});
+
+// ─── SMOOTH ANCHOR SCROLL ───
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const t = document.querySelector(a.getAttribute('href'));
+    if (!t) return;
+    e.preventDefault();
+    window.scrollTo({top: t.getBoundingClientRect().top + window.scrollY - 72, behavior: 'smooth'});
+  });
+});
+
+// ─── NAV initial state ───
+gsap.set('#main-nav', {opacity: 0, y: -12});
+</script>
+<script>
+		// ═══════════════════════════════════════════════════
+		// VIDEO POPUP SYSTEM
+		// ════════════════════════════════════════════════
+		document.addEventListener('DOMContentLoaded', function() {
+		  const popup     = document.getElementById('vid-popup');
+		  const popCanvas = document.getElementById('vid-popup-canvas');
+		  const popVideo  = document.getElementById('vid-popup-video');
+		  const popName   = document.getElementById('vid-popup-name');
+
+		  let animId = null;
+		  let frame  = 0;
+		  let boxes  = [];
+		  const PW = 300, PH = 168;
+
+		  // ── Canvas crack-detection simulation ──
+		  function genBox(w, h) {
+		    const bw = 28 + Math.random() * 72;
+		    const bh = 16 + Math.random() * 36;
+		    return {
+		      x: 8 + Math.random() * (w - bw - 8),
+		      y: 8 + Math.random() * (h - bh - 8),
+		      w: bw, h: bh,
+		      conf: 0.62 + Math.random() * 0.37,
+		      sev: ['minor','moderate','severe'][Math.floor(Math.random() * 3)],
+		      age: 0, life: 48 + Math.floor(Math.random() * 55)
+		    };
+		  }
+
+		  function startCanvas(label) {
+		    stopCanvas();
+		    frame = 0; boxes = [];
+		    popCanvas.width  = popCanvas.offsetWidth  || PW;
+		    popCanvas.height = popCanvas.offsetHeight || PH;
+		    const ctx = popCanvas.getContext('2d');
+		    const W = popCanvas.width, H = popCanvas.height;
+
+		    // Seed one box immediately so popup isn't empty
+		    boxes.push(genBox(W, H));
+
+		    function tick() {
+		      // Background
+		      ctx.fillStyle = '#131110';
+		      ctx.fillRect(0, 0, W, H);
+
+		      // Subtle grid
+		      ctx.strokeStyle = 'rgba(72,68,62,.18)';
+		      ctx.lineWidth = .5;
+		      for (let x = 0; x < W; x += 28) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+		      for (let y = 0; y < H; y += 28) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+		      // Scan line
+		      const sy = (frame * 1.1) % H;
+		      const g  = ctx.createLinearGradient(0, sy - 16, 0, sy + 4);
+		      g.addColorStop(0, 'rgba(0,0,0,0)');
+		      g.addColorStop(1, 'rgba(185,180,170,.11)');
+		      ctx.fillStyle = g;
+		      ctx.fillRect(0, sy - 16, W, 20);
+
+		      // Horizontal scan pulse
+		      ctx.strokeStyle = `rgba(190,185,175,${.07 + .04 * Math.sin(frame * .08)})`;
+		      ctx.lineWidth = .8;
+		      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
+
+		      // Spawn boxes
+		      if (frame % 40 === 0 && boxes.length < 4) boxes.push(genBox(W, H));
+		      boxes = boxes.filter(b => b.age < b.life);
+
+		      boxes.forEach(b => {
+		        const a = b.age < 8 ? b.age / 8 : b.age > b.life - 8 ? (b.life - b.age) / 8 : 1;
+		        // Box
+		        ctx.strokeStyle = `rgba(198,192,182,${.52 * a})`;
+		        ctx.lineWidth = .9;
+		        ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+		        // Corner brackets
+		        const cs = 5;
+		        ctx.lineWidth = 1.5;
+		        ctx.strokeStyle = `rgba(198,192,182,${.75 * a})`;
+		        [[0,0],[1,0],[0,1],[1,1]].forEach(([ix,iy]) => {
+		          const px = b.x + ix * b.w, py = b.y + iy * b.h;
+		          const sx = ix ? -1 : 1, sy2 = iy ? -1 : 1;
+		          ctx.beginPath();
+		          ctx.moveTo(px, py + sy2 * cs); ctx.lineTo(px, py); ctx.lineTo(px + sx * cs, py);
+		          ctx.stroke();
+		        });
+
+		        // Label
+		        ctx.fillStyle = `rgba(195,190,180,${.62 * a})`;
+		        ctx.font = 'bold 6px "Arial Narrow",sans-serif';
+		        ctx.fillText(`crack  ${(b.conf * 100).toFixed(0)}%  ${b.sev}`, b.x + 2, b.y - 3);
+		        b.age++;
+		      });
+
+		      // HUD corner text
+		      ctx.fillStyle = 'rgba(130,125,118,.3)';
+		      ctx.font = '5.5px "Arial Narrow",sans-serif';
+		      ctx.fillText('CRACKDETECT  LIVE PREVIEW', 6, 9);
+		      ctx.fillText(label.toUpperCase(), 6, H - 5);
+
+		      frame++;
+		      animId = requestAnimationFrame(tick);
+		    }
+		    tick();
+		  }
+
+		  function stopCanvas() {
+		    if (animId) { cancelAnimationFrame(animId); animId = null; }
+		  }
+
+		  // ── Positioning ──
+		  function placePopup(e) {
+		    const PH_TOTAL = popup.offsetHeight || 196;
+		    let x = e.clientX + 18;
+		    let y = e.clientY - PH_TOTAL / 2;
+		    if (x + PW > window.innerWidth - 12) x = e.clientX - PW - 18;
+		    if (y < 10) y = 10;
+		    if (y + PH_TOTAL > window.innerHeight - 10) y = window.innerHeight - PH_TOTAL - 10;
+		    popup.style.left = x + 'px';
+		    popup.style.top  = y + 'px';
+		  }
+
+		  // ── Show / hide ──
+		  function showPopup(trigger, e) {
+		    const label = trigger.dataset.label || 'DEMO';
+		    const vsrc = (trigger.dataset.video || '').trim();
+		    popName.textContent = '{ ' + label.toUpperCase() + ' }';
+
+		    placePopup(e);
+
+		    // Reset video element to avoid stale state
+		    popVideo.src = '';
+		    popVideo.removeAttribute('src');
+		    try {
+		      popVideo.load();
+		    } catch (_) {}
+		    popVideo.pause();
+		    popVideo.style.display = 'none';
+
+		    if (vsrc) {
+		      popVideo.src = vsrc;
+		      popVideo.classList.remove('loaded');
+		      popVideo.style.display = 'block';
+		      popVideo.oncanplay = () => {
+		        popVideo.classList.add('loaded');
+		      };
+		      popVideo.onerror = (e) => {
+		        console.error('Video error:', e);
+		        popName.textContent = '{ VIDEO ERROR }';
+		        popVideo.style.display = 'none';
+		        // Keep canvas running underneath
+		      };
+		      popVideo.play().catch(() => {/* ignore */});
+		      startCanvas(label);
+		    } else {
+		      // No video source, just show canvas
+		      startCanvas(label);
+		    }
+
+		    popup.classList.add('show');
+		  }
+
+		  function hidePopup() {
+		    popup.classList.remove('show');
+		    stopCanvas();
+		    popVideo.pause();
+		    popVideo.src = '';
+		    popVideo.classList.remove('loaded');
+		  }
+
+		  // ── Attach to all triggers ──
+		  document.querySelectorAll('.vid-trigger').forEach(t => {
+		    t.addEventListener('mouseenter', e => showPopup(t, e));
+		    t.addEventListener('mousemove',  e => placePopup(e));
+		    t.addEventListener('mouseleave', hidePopup);
+		  });
+		});
+
+		</script>
+		<!-- ═══ VIDEO POPUP ═══ -->
+		<div id="vid-popup">
+		  <div id="vid-popup-screen">
+		    <canvas id="vid-popup-canvas"></canvas>
+		    <video id="vid-popup-video" autoplay muted loop playsinline></video>
+		  </div>
+		  <div id="vid-popup-bar">
+		    <span id="vid-popup-name">{ DEMO PREVIEW }</span>
+		    <span id="vid-popup-indicator">
+		      <span id="vid-popup-dot"></span>
+		      LIVE
+		    </span>
+		  </div>
+		</div>
+
+
+</body>
+</html>

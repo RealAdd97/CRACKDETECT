@@ -1,0 +1,7 @@
+path: C:/crack-detector
+train: train
+val: valid
+test: test
+
+names:
+  0: crack
