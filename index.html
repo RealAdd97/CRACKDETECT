@@ -809,6 +809,31 @@ footer{padding:4.5rem 2.5rem;display:flex;align-items:flex-end;justify-content:s
   background: rgba(160,155,148,.4);
   animation: vid-pulse 1.4s ease-in-out infinite;
 }
+/* ─── FULLSCREEN OVERLAYS ─── */
+
+/* Styles applied ONLY when the popup goes fullscreen */
+#vid-popup:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: none !important; /* Resets positioning animations */
+  display: flex;
+  flex-direction: column;
+  background: #080808;
+}
+
+/* Make the video/canvas viewport fill all available space above the status bar */
+#vid-popup:fullscreen #vid-popup-screen {
+  flex: 1;
+  height: auto; /* Overrides the static 168px height */
+}
+
+/* Allow pointer events back in fullscreen so user can double-click anywhere to exit */
+#vid-popup:fullscreen {
+  pointer-events: auto;
+  cursor: none;
+}
 @keyframes vid-pulse {
   0%,100% { opacity: .4; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.3); }
@@ -879,7 +904,7 @@ footer{padding:4.5rem 2.5rem;display:flex;align-items:flex-end;justify-content:s
   <div id="loader-inner">
     <div id="loader-top">
       <span class="loader-label">{ LOADING }</span>
-      <span class="loader-label">CRACKDETECT ,  YOLOv8</span>
+      <span class="loader-label">CRACKDETECT | YOLOv8</span>
     </div>
     <div id="loader-mid">
       <span id="loader-num">0</span>
@@ -887,23 +912,25 @@ footer{padding:4.5rem 2.5rem;display:flex;align-items:flex-end;justify-content:s
     </div>
     <div id="loader-bottom">
       <div class="loader-ticker">
-        <span class="loader-ticker-item">CRACK DETECTION</span>
+        <span class="loader-ticker-item">HOVER UNDERLINED TEXT FOR VIDEO POPUPS SHOWING ANNOTATED DETECTIONS</span>
+        <span class="loader-ticker-item">, </span>
+        <span class="loader-ticker-item">DOUBLE-CLICK POPUP TO ENTER FULLSCREEN MODE</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">YOLOV8</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">SEVERITY ANALYSIS</span>
         <span class="loader-ticker-item">, </span>
-        <span class="loader-ticker-item">VIDEO INSPECTION</span>
+        <span class="loader-ticker-item">VIDEOS DEMO: BOUNDING BOXES, TEMPORAL FILTERING, SEVERITY LEVELS</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">TRANSFER LEARNING</span>
         <span class="loader-ticker-item">, </span>
-        <span class="loader-ticker-item">CRACK DETECTION</span>
+        <span class="loader-ticker-item">HOVER TERMS LIKE ANNOTATED OUTPUT, SEVERITY HEURISTIC, FRAME-BY-FRAME</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">YOLOV8</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">SEVERITY ANALYSIS</span>
         <span class="loader-ticker-item">, </span>
-        <span class="loader-ticker-item">VIDEO INSPECTION</span>
+        <span class="loader-ticker-item">ESC OR DOUBLE-CLICK TO EXIT FULLSCREEN</span>
         <span class="loader-ticker-item">, </span>
         <span class="loader-ticker-item">TRANSFER LEARNING</span>
         <span class="loader-ticker-item">, </span>
@@ -2064,10 +2091,37 @@ gsap.set('#main-nav', {opacity: 0, y: -12});
 
 		  // ── Attach to all triggers ──
 		  document.querySelectorAll('.vid-trigger').forEach(t => {
-		    t.addEventListener('mouseenter', e => showPopup(t, e));
-		    t.addEventListener('mousemove',  e => placePopup(e));
-		    t.addEventListener('mouseleave', hidePopup);
-		  });
+  t.addEventListener('mouseenter', e => showPopup(t, e));
+  t.addEventListener('mousemove',  e => placePopup(e));
+  t.addEventListener('mouseleave', () => {
+    // Only hide the popup if we aren't currently in fullscreen mode
+    if (!document.fullscreenElement) {
+      hidePopup();
+    }
+  });
+
+  // New Double-Click Listener for Fullscreen Toggle
+  t.addEventListener('dblclick', (e) => {
+    e.preventDefault(); // Prevent text selection on rapid clicking
+    
+    if (!document.fullscreenElement) {
+      // Go fullscreen! Target the entire popup element so overlays stay intact
+      popup.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      // Exit fullscreen if already active
+      document.exitFullscreen();
+    }
+  });
+});
+
+// Optional: Automatically clean up/hide popup when manually exiting fullscreen via ESC key
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    hidePopup();
+  }
+});
 		});
 
 		</script>
